@@ -4,8 +4,8 @@ const SwitchAutoComplete = "off";
 // Only numbers can be entered
 const NumberOnly = false;
 
-// "int": positive integers
-// "decimal" [unfinished]: decimal point, minus sign and "int"
+// "int": integers
+// "decimal": decimal point, minus sign and "int"
 const NumberOnlyMode = "int";
 
 // coordinate which you want to ban
@@ -35,6 +35,7 @@ Qualtrics.SurveyEngine.addOnload(function () {
             if (banTable[rindex][index] == 0)
                 input.setAttribute("disabled", "disabled");
             if (NumberOnly) {
+                input.setAttribute("onkeyup", "checkValue(event)");
                 input.setAttribute(
                     "onbeforeinput",
                     "numbersFilter(event,'" + NumberOnlyMode + "')"
@@ -44,20 +45,41 @@ Qualtrics.SurveyEngine.addOnload(function () {
     });
 });
 
-function numbersFilter(event, mode) {
-    let key = event.data;
-    let value = event.target.value;
-    let check = !event.inputType.startsWith("insert");
-    switch (mode) {
-        case "int":
-            check = check || /[\d]/.test(key);
-            break;
-        case "decimal":
-            // TODO: check values
-            break;
-        default:
-            break;
+function checkValue(event) {
+    if (event.isComposing) event.target.value = "";
+
+    const value = event.target.value;
+    if (
+        !value.endsWith(".") &&
+        (value.startsWith("0") || (value.startsWith("-0") && value.length > 2))
+    ) {
+        let num = Number(value);
+        event.target.value = num;
     }
+}
+
+function numbersFilter(event, mode) {
+    const key = event.data;
+    const value = event.target.value;
+
+    if (event.inputType.startsWith("delete")) return;
+
+    let check = event.inputType.startsWith("insert");
+    const start = event.target.selectionStart;
+    const mIndex = value.indexOf("-");
+    const pIndex = value.indexOf(".");
+    const mFlag = key == "-" && start == 0 && mIndex < 0;
+    const pFlag = key == "." && pIndex < 0 && start - 1 > mIndex;
+    if (check && mode == "int") {
+        check = /[\d]/.test(key);
+        check = check || mFlag;
+    }
+    if (check && mode == "decimal") {
+        check = !isNaN(parseFloat(key) && isFinite(key));
+        check = check || mFlag || pFlag;
+    }
+    check = check && start > mIndex;
+
     if (!check) {
         event.preventDefault();
     }
